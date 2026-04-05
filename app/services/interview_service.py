@@ -307,7 +307,7 @@ Interview History:
             scores = [h["evaluation"].get("score", 5) for h in history]
             avg = sum(scores) / len(scores) if scores else 5
             return {
-                "final_score": f"{round(avg * 10)}%",
+                "overall_score": round(avg * 10),
                 "average_score": avg,
                 "strong_areas": [],
                 "weak_areas": [],
@@ -322,7 +322,7 @@ Interview History:
             perf = InterviewPerformance(
                 user_id=session.user_id,
                 role=session.role,
-                overall_score=summary.get("average_score", 0) * 10,
+                overall_score=summary.get("overall_score", summary.get("average_score", 0) * 10),
                 average_score=summary.get("average_score", 0),
                 strong_areas=summary.get("strong_areas", []),
                 weak_areas=summary.get("weak_areas", []),

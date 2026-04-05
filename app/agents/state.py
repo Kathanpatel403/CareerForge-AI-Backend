@@ -81,8 +81,8 @@ class DifficultyResponse(BaseModel):
     next_difficulty: str = Field(description="The next difficulty level (beginner, intermediate, advanced)")
 
 class InterviewSummary(BaseModel):
-    final_score: str = Field(description="Overall percentage or grade")
-    average_score: float = Field(description="Average score across all questions")
+    overall_score: float = Field(description="Overall percentage score (0-100)")
+    average_score: float = Field(description="Average score across all questions (0-10)")
     strong_areas: List[str] = Field(description="Topics the user excelled in")
     weak_areas: List[str] = Field(description="Topics the user struggled with")
     improvement_plan: List[str] = Field(description="Actionable steps for improvement")
