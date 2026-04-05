@@ -7,6 +7,7 @@ class AgentState(TypedDict):
     """
     user_input: str
     intent: Optional[str]
+    target_role: Optional[str]  # e.g., 'GenAI Engineer', 'UX Designer'
     resume_data: Optional[Dict[str, Any]]
     skill_gap: Optional[Dict[str, Any]]
     roadmap: Optional[Dict[str, Any]]
@@ -41,6 +42,7 @@ class InterviewState(TypedDict):
 # Pydantic models for structured output
 class IntentResponse(BaseModel):
     intent: str = Field(description="One of: resume_analysis, roadmap_generation, interview_preparation, general_query")
+    target_role: Optional[str] = Field(description="The role mentioned (e.g. 'Backend Developer'), or None if not found")
     reason: str = Field(description="Brief reason for this classification")
 
 class ResumeAnalysis(BaseModel):
@@ -86,3 +88,7 @@ class InterviewSummary(BaseModel):
     strong_areas: List[str] = Field(description="Topics the user excelled in")
     weak_areas: List[str] = Field(description="Topics the user struggled with")
     improvement_plan: List[str] = Field(description="Actionable steps for improvement")
+
+class RequiredSkills(BaseModel):
+    role: str = Field(description="The normalized name of the role (e.g., UX Designer)")
+    skills: List[str] = Field(description="8-10 core technical and soft skills for this role")

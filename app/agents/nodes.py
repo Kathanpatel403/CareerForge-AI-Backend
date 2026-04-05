@@ -10,7 +10,7 @@ from app.models.interview import InterviewPerformance
 from app.agents.state import (
     AgentState, InterviewState, IntentResponse, ResumeAnalysis, 
     SkillGap, Roadmap, RoadmapStep, InterviewQuestion, InterviewEvaluation, 
-    DifficultyResponse, InterviewSummary
+    DifficultyResponse, InterviewSummary, RequiredSkills
 )
 
 # Helper to get the default LLM
@@ -37,32 +37,68 @@ ROLE_SKILLS_MAP = {
     "Data Scientist": ["Python", "SQL", "Pandas", "Scikit-Learn", "Deep Learning", "Statistics", "Machine Learning", "PyTorch"]
 }
 
+async def get_dynamic_skills(role: str) -> List[str]:
+    """Provides a list of core skills for any given role, using cache or LLM."""
+    # Check static map first
+    if role in ROLE_SKILLS_MAP:
+        return ROLE_SKILLS_MAP[role]
+        
+    # Check for case-insensitive match
+    for r, skills in ROLE_SKILLS_MAP.items():
+        if r.lower() == role.lower():
+            return skills
+
+    # Not found - Fetch dynamically from LLM
+    llm = get_llm()
+    parser = PydanticOutputParser(pydantic_object=RequiredSkills)
+    
+    prompt = f"""
+    You are an expert technical recruiter. Based on the role of: {role}, identify the 8-10 most critical 
+    technical and soft skills required to be highly successful in this position today.
+    
+    Return a clean list of skills (e.g. ['React', 'TypeScript', 'Node.js', ...])
+    
+    {parser.get_format_instructions()}
+    """
+    
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        parsed = parser.parse(response.content)
+        return parsed.skills
+    except Exception as e:
+        logging.error(f"Failed to fetch dynamic skills for role '{role}': {e}")
+        return ROLE_SKILLS_MAP.get("GenAI Engineer", []) # Final fallback
+
 # --- Intent Classification Node ---
 async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
     llm = get_llm()
     parser = PydanticOutputParser(pydantic_object=IntentResponse)
     
     prompt = f"""
-    You are an AI Career Assistant. Classify the user's input into one of the following intents:
+    You are an AI Career Assistant. 1. Classify the user's input into one of the following intents:
     - resume_analysis: If the user provides a resume or asks to analyze their profile.
-    - roadmap_generation: If the user asks for a learning path or how to achieve a career goal.
+    - roadmap_generation: If the user asks for a learning path, skill gaps, or how to achieve a goal.
     - interview_preparation: If the user asks for interview questions or practice.
-    - general_query: Anything else.
+    - general_query: Generic greetings/questions.
+    
+    2. Extract or infer the target role they are interested in (e.g. 'UX Developer', 'GenAI Engineer'). 
+    Default to 'GenAI Engineer' if not specified or unclear.
     
     User input: {state['user_input']}
     
     {parser.get_format_instructions()}
     """
     
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
     try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
         parsed_res = parser.parse(response.content)
-        return {**state, "intent": parsed_res.intent}
+        return {**state, "intent": parsed_res.intent, "target_role": parsed_res.target_role or "GenAI Engineer"}
     except Exception:
         # Fallback
+        role = "GenAI Engineer"
         if "resume" in state['user_input'].lower() or state.get('file_content'):
-            return {**state, "intent": "resume_analysis"}
-        return {**state, "intent": "general_query"}
+            return {**state, "intent": "resume_analysis", "target_role": role}
+        return {**state, "intent": "general_query", "target_role": role}
 
 # --- Resume Analysis Node ---
 async def resume_analyzer_node(state: AgentState) -> Dict[str, Any]:
@@ -93,14 +129,15 @@ async def resume_analyzer_node(state: AgentState) -> Dict[str, Any]:
 
 # --- Skill Gap Node ---
 async def skill_gap_node(state: AgentState) -> Dict[str, Any]:
-    # Determine target role - default to 'GenAI Engineer' if not specified
-    target_role = "GenAI Engineer" 
-    # (Future refinement: extract target role from input if available)
+    # Determine target role from state (set in classification)
+    target_role = state.get("target_role") or "GenAI Engineer"
+    
+    # Dynamically get required skills for this role
+    required_skills = await get_dynamic_skills(target_role)
     
     resume_data = state.get('resume_data') or {}
     skills_list = resume_data.get('skills') or []
     user_skills = [s.lower() for s in skills_list]
-    required_skills = ROLE_SKILLS_MAP.get(target_role, [])
     
     matched = []
     missing = []

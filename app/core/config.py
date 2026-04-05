@@ -16,9 +16,16 @@ class Settings(BaseSettings):
     # GenAI / LangChain credentials
     OPENAI_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
+    
+    # LangChain / LangSmith Tracing
     LANGCHAIN_API_KEY: Optional[str] = None
-    LANGCHAIN_TRACING_V2: str = "false"
+    LANGCHAIN_TRACING_V2: str = "true"
     LANGCHAIN_PROJECT: str = "ai-career-copilot"
+    
+    LANGSMITH_TRACING: str = "true"
+    LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
+    LANGSMITH_API_KEY: Optional[str] = None
+    LANGSMITH_PROJECT: str = "CareerForgeAI"
 
     # JWT Authentication
     SECRET_KEY: str = "supersecretkey"  # Override via .env
@@ -34,6 +41,9 @@ class Settings(BaseSettings):
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
 
-    model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        extra="ignore" # Prevents crashes if extra variables are in .env
+    )
 
 settings = Settings()
